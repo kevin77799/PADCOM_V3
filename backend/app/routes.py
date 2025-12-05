@@ -23,6 +23,9 @@ def analyze_brain_tumor():
         return jsonify({
             'result': 'Positive' if result['prediction'] == 'Tumor Detected' else 'Negative',
             'confidence': float(result['confidence'].strip('%')) / 100,
+            'prediction': result['prediction'],
+            'analysis': result.get('analysis', ''),
+            'model': result.get('model', 'unknown'),
             'regions': [
                 {
                     'x': 30,
@@ -54,6 +57,9 @@ def analyze_pneumonia():
         return jsonify({
             'result': 'Positive' if result['prediction'] == 'PNEUMONIA' else 'Negative',
             'confidence': float(result['confidence'].strip('%')) / 100,
+            'prediction': result['prediction'],
+            'analysis': result.get('analysis', ''),
+            'model': result.get('model', 'unknown'),
             'affectedAreas': [
                 {
                     'region': 'Lower Right Lung',
@@ -66,4 +72,28 @@ def analyze_pneumonia():
             ] if result['prediction'] == 'PNEUMONIA' else []
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/model-info', methods=['GET'])
+def get_model_info():
+    """Get information about currently used AI models"""
+    return jsonify({
+        'models': {
+            'brain_tumor': {
+                'primary': 'ollama_llava:13b',
+                'fallback': 'pytorch_resnet18',
+                'description': 'Vision model for MRI brain tumor detection'
+            },
+            'pneumonia': {
+                'primary': 'ollama_llava:7b',
+                'fallback': 'pytorch_custom_cnn',
+                'description': 'Vision model for chest X-ray pneumonia detection'
+            },
+            '3d_reconstruction': {
+                'model': 'mistral',
+                'description': 'Text model for generating 3D volumetric data'
+            }
+        },
+        'backend': 'ollama',
+        'status': 'active'
+    }) 

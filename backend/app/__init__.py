@@ -7,6 +7,9 @@ def create_app():
 
     # Import and register blueprints
     from .routes import api
+    from .routes_3d import api_3d
+    
     app.register_blueprint(api)
+    app.register_blueprint(api_3d)
 
     return app 

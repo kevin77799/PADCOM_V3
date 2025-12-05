@@ -30,6 +30,15 @@ const navigationItems = [
     ),
   },
   {
+    name: '3D Analysis',
+    path: '/analysis-3d',
+    icon: (
+      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.646 7.23a2 2 0 01-1.789 1.106H5a2 2 0 01-2-2v-8a2 2 0 012-2h.5a2 2 0 00.866-.23l.513-.256A2 2 0 0110 5.07V5a2 2 0 012-2h1a2 2 0 012 2v5m-6 6v2" />
+      </svg>
+    ),
+  },
+  {
     name: 'Settings',
     path: '/settings',
     icon: (

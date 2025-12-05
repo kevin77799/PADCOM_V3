@@ -10,6 +10,7 @@ import './App.css';
 // Lazy load the pages
 const BrainTumorAnalysis = lazy(() => import('./pages/BrainTumorAnalysis'));
 const PneumoniaAnalysis = lazy(() => import('./pages/PneumoniaAnalysis'));
+const Analysis3D = lazy(() => import('./pages/Analysis3D'));
 
 const App: React.FC = () => {
   return (
@@ -24,6 +25,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/brain-tumor" element={<BrainTumorAnalysis />} />
                 <Route path="/pneumonia" element={<PneumoniaAnalysis />} />
+                <Route path="/analysis-3d" element={<Analysis3D />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </Suspense>
