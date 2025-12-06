@@ -1,21 +1,30 @@
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-from torchvision import models
+try:
+    import torch
+    import torch.nn as nn
+    import torchvision.transforms as transforms
+    from torchvision import models
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 from PIL import Image
 import io
 import re
 from ollama_service import OllamaService
 
-# Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-# Image preprocessing transforms
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+# Device configuration (only if torch is available)
+if TORCH_AVAILABLE:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # Image preprocessing transforms
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+else:
+    device = None
+    transform = None
 
 # Initialize Ollama service for brain tumor analysis
 ollama_service = OllamaService(model_name="llava:13b")
@@ -23,21 +32,25 @@ use_ollama = ollama_service.is_available()
 
 if use_ollama:
     print("✓ Ollama service detected. Using llava:13b for brain tumor analysis.")
+    brain_model = None
 else:
     print("✗ Ollama service not available. Falling back to PyTorch model.")
-    # Initialize PyTorch model as fallback
-    brain_model = models.resnet18(weights=None)
-    brain_model.fc = nn.Linear(brain_model.fc.in_features, 1)
-    
-    # Try to load the model weights if they exist
-    try:
-        brain_model.load_state_dict(torch.load('models/tumor_classification_resnet18.pth', map_location=device))
-    except FileNotFoundError:
-        print("Warning: tumor_classification_resnet18.pth not found. Using untrained model.")
-    
-    brain_model.to(device)
-    brain_model.eval()
-    brain_model = None  # Set to None if Ollama is available
+    if TORCH_AVAILABLE:
+        # Initialize PyTorch model as fallback
+        brain_model = models.resnet18(weights=None)
+        brain_model.fc = nn.Linear(brain_model.fc.in_features, 1)
+        
+        # Try to load the model weights if they exist
+        try:
+            brain_model.load_state_dict(torch.load('models/tumor_classification_resnet18.pth', map_location=device))
+        except FileNotFoundError:
+            print("Warning: tumor_classification_resnet18.pth not found. Using untrained model.")
+        
+        brain_model.to(device)
+        brain_model.eval()
+    else:
+        print("Warning: PyTorch not available either. Brain tumor analysis will use Ollama only.")
+        brain_model = None
 
 def preprocess_image(image_bytes):
     """Image preprocessing with error handling"""

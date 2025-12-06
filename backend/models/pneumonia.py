@@ -1,21 +1,30 @@
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
+try:
+    import torch
+    import torch.nn as nn
+    import torchvision.transforms as transforms
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 from PIL import Image
 import io
 import re
 from ollama_service import OllamaService
 
-# Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-# Image preprocessing transforms
-transform = transforms.Compose([
-    transforms.Grayscale(num_output_channels=1),
-    transforms.Resize((256, 256)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485], std=[0.229])
-])
+# Device configuration (only if torch is available)
+if TORCH_AVAILABLE:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # Image preprocessing transforms
+    transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Resize((256, 256)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485], std=[0.229])
+    ])
+else:
+    device = None
+    transform = None
 
 # Initialize Ollama service for pneumonia analysis
 ollama_service = OllamaService(model_name="llava:7b")
@@ -23,31 +32,36 @@ use_ollama = ollama_service.is_available()
 
 if use_ollama:
     print("✓ Ollama service detected. Using llava:7b for pneumonia analysis.")
+    pneumonia_model = None
 else:
     print("✗ Ollama service not available. Falling back to PyTorch model.")
-    pneumonia_model = None
+    if TORCH_AVAILABLE:
+        pneumonia_model = None  # Will be initialized below if needed
+    else:
+        pneumonia_model = None
 
-class PneumoniaModel(nn.Module):
-    def __init__(self):
-        super(PneumoniaModel, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.dropout = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(128 * 32 * 32, 512)
-        self.fc2 = nn.Linear(512, 1)
+if TORCH_AVAILABLE:
+    class PneumoniaModel(nn.Module):
+        def __init__(self):
+            super(PneumoniaModel, self).__init__()
+            self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+            self.bn1 = nn.BatchNorm2d(32)
+            self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+            self.bn2 = nn.BatchNorm2d(64)
+            self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+            self.bn3 = nn.BatchNorm2d(128)
+            self.pool = nn.MaxPool2d(2, 2)
+            self.dropout = nn.Dropout(0.5)
+            self.fc1 = nn.Linear(128 * 32 * 32, 512)
+            self.fc2 = nn.Linear(512, 1)
 
-    def forward(self, x):
-        x = self.pool(torch.relu(self.bn1(self.conv1(x))))
-        x = self.pool(torch.relu(self.bn2(self.conv2(x))))
-        x = self.pool(torch.relu(self.bn3(self.conv3(x))))
-        x = x.view(x.size(0), -1)
-        x = torch.relu(self.fc1(x))
-        x = self.dropout(x)
+        def forward(self, x):
+            x = self.pool(torch.relu(self.bn1(self.conv1(x))))
+            x = self.pool(torch.relu(self.bn2(self.conv2(x))))
+            x = self.pool(torch.relu(self.bn3(self.conv3(x))))
+            x = x.view(x.size(0), -1)
+            x = torch.relu(self.fc1(x))
+            x = self.dropout(x)
         x = self.fc2(x)
         return x
 
