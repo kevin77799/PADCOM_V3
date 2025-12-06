@@ -1,16 +1,23 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Settings } from 'lucide-react';
+import { Settings, Activity } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   return (
     <nav className="bg-black bg-opacity-50 backdrop-blur-md text-cyan-300 shadow-lg border-b border-cyan-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
+          <div className="flex items-center gap-8">
             <Link to="/" className="flex items-center">
               <span className="text-2xl font-bold text-cyan-400">PADCOM</span>
               <span className="ml-2 text-xs text-gray-500">System Online</span>
+            </Link>
+            <Link 
+              to="/medical" 
+              className="flex items-center gap-2 text-sm hover:text-cyan-300 transition"
+            >
+              <Activity size={18} />
+              Medical Analysis
             </Link>
           </div>
           <div className="flex items-center space-x-4">

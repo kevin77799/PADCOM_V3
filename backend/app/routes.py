@@ -19,6 +19,15 @@ except Exception as e:
     voice_service = None
     VOICE_AVAILABLE = False
 
+# Import medical models
+try:
+    from models.brain_tumor import predict_brain_tumor
+    from models.pneumonia import predict_pneumonia
+    MEDICAL_MODELS_AVAILABLE = True
+except Exception as e:
+    print(f"[WARNING] Medical models not available: {e}")
+    MEDICAL_MODELS_AVAILABLE = False
+
 api = Blueprint('api', __name__)
 
 @api.route('/api/chat', methods=['POST'])
@@ -90,4 +99,80 @@ def chat():
         
     except Exception as e:
         print(f"Chat Error: {e}")
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
+
+
+# Medical Image Analysis Endpoints
+@api.route('/api/medical/brain-tumor', methods=['POST'])
+def analyze_brain_tumor():
+    """
+    Brain tumor detection endpoint
+    Accepts: Image file (multipart/form-data)
+    Returns: Prediction with confidence
+    """
+    try:
+        if not MEDICAL_MODELS_AVAILABLE:
+            return jsonify({'error': 'Medical models not available'}), 503
+        
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image file provided'}), 400
+            
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+            
+        if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            return jsonify({'error': 'Invalid file format. Please upload PNG or JPG images.'}), 400
+            
+        image_bytes = file.read()
+        result = predict_brain_tumor(image_bytes)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Brain tumor analysis error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api.route('/api/medical/pneumonia', methods=['POST'])
+def analyze_pneumonia():
+    """
+    Pneumonia detection endpoint
+    Accepts: Chest X-ray image file (multipart/form-data)
+    Returns: Prediction with confidence
+    """
+    try:
+        if not MEDICAL_MODELS_AVAILABLE:
+            return jsonify({'error': 'Medical models not available'}), 503
+        
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image file provided'}), 400
+            
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+            
+        if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            return jsonify({'error': 'Invalid file format. Please upload PNG or JPG images.'}), 400
+            
+        image_bytes = file.read()
+        result = predict_pneumonia(image_bytes)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Pneumonia analysis error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api.route('/api/medical/status', methods=['GET'])
+def medical_status():
+    """Get status of medical models"""
+    return jsonify({
+        'medical_models_available': MEDICAL_MODELS_AVAILABLE,
+        'models': {
+            'brain_tumor': 'Available' if MEDICAL_MODELS_AVAILABLE else 'Not trained',
+            'pneumonia': 'Available' if MEDICAL_MODELS_AVAILABLE else 'Not trained'
+        },
+        'message': 'Run train_models.py to train models' if not MEDICAL_MODELS_AVAILABLE else 'Models ready'
+    }) 
