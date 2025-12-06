@@ -54,7 +54,7 @@ if LANGGRAPH_AVAILABLE:
         context = state["context"]
         
         system_prompt = (
-            f"You are Jarvis, a highly advanced, intelligent, and helpful AI assistant. "
+            f"You are PADCOM, a highly advanced, intelligent, and helpful AI assistant. "
             f"You have access to the user's personal data:\n"
             f"--- DATA START ---\n{context}\n--- DATA END ---\n\n"
             f"Rules:\n"
