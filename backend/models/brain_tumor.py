@@ -1,59 +1,71 @@
-try:
-    import torch
-    import torch.nn as nn
-    import torchvision.transforms as transforms
-    from torchvision import models
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-
 from PIL import Image
 import io
 import re
-from ollama_service import OllamaService
 
-# Device configuration (only if torch is available)
-if TORCH_AVAILABLE:
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Lazy-loaded globals - avoid slow torch import at module load
+TORCH_AVAILABLE = False
+ollama_service = None
+use_ollama = False
+brain_model = None
+device = None
+transform = None
+_initialized = False
+
+def _initialize():
+    """Lazy initialization - called on first use."""
+    global TORCH_AVAILABLE, ollama_service, use_ollama, brain_model, device, transform, _initialized
     
-    # Image preprocessing transforms
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-else:
-    device = None
-    transform = None
-
-# Initialize Ollama service for brain tumor analysis
-ollama_service = OllamaService(model_name="llava:13b")
-use_ollama = ollama_service.is_available()
-
-if use_ollama:
-    print("✓ Ollama service detected. Using llava:13b for brain tumor analysis.")
-    brain_model = None
-else:
-    print("✗ Ollama service not available. Falling back to PyTorch model.")
-    if TORCH_AVAILABLE:
-        # Initialize PyTorch model as fallback
-        brain_model = models.resnet18(weights=None)
-        brain_model.fc = nn.Linear(brain_model.fc.in_features, 1)
+    if _initialized:
+        return
+    
+    # Try to import and initialize torch
+    try:
+        import torch
+        import torch.nn as nn
+        import torchvision.transforms as tv_transforms
+        from torchvision import models
+        TORCH_AVAILABLE = True
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        transform = tv_transforms.Compose([
+            tv_transforms.Resize((224, 224)),
+            tv_transforms.ToTensor(),
+            tv_transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+    except ImportError:
+        TORCH_AVAILABLE = False
+    
+    # Initialize Ollama service
+    try:
+        from ollama_service import OllamaService
+        ollama_service = OllamaService(model_name="llava:13b")
+        use_ollama = ollama_service.is_available()
         
-        # Try to load the model weights if they exist
-        try:
-            brain_model.load_state_dict(torch.load('models/tumor_classification_resnet18.pth', map_location=device))
-        except FileNotFoundError:
-            print("Warning: tumor_classification_resnet18.pth not found. Using untrained model.")
-        
-        brain_model.to(device)
-        brain_model.eval()
-    else:
-        print("Warning: PyTorch not available either. Brain tumor analysis will use Ollama only.")
-        brain_model = None
+        if use_ollama:
+            print("✓ Ollama service detected. Using llava:13b for brain tumor analysis.")
+        else:
+            print("✗ Ollama service not available. Using PyTorch fallback.")
+            if TORCH_AVAILABLE:
+                import torch
+                from torchvision import models
+                brain_model = models.resnet18(weights=None)
+                brain_model.fc = nn.Linear(brain_model.fc.in_features, 1)
+                try:
+                    brain_model.load_state_dict(torch.load('models/tumor_classification_resnet18.pth', map_location=device))
+                except FileNotFoundError:
+                    print("Warning: tumor_classification_resnet18.pth not found. Using untrained model.")
+                brain_model.to(device)
+                brain_model.eval()
+    except Exception as e:
+        print(f"Warning: Failed to initialize: {e}")
+        use_ollama = False
+    
+    _initialized = True
 
 def preprocess_image(image_bytes):
     """Image preprocessing with error handling"""
+    _initialize()  # Lazy load torch if needed
+    if transform is None:
+        raise RuntimeError("Image transform not available. PyTorch not installed.")
     try:
         image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
         return transform(image)
@@ -89,6 +101,10 @@ def parse_ollama_response(response_text):
 
 def predict_brain_tumor_ollama(image_bytes):
     """Brain tumor prediction using Ollama llava:13b"""
+    _initialize()  # Lazy load if needed
+    if not use_ollama:
+        raise RuntimeError("Ollama not available")
+    
     try:
         result = ollama_service.analyze_medical_image(image_bytes, analysis_type="brain_tumor")
         
@@ -111,7 +127,12 @@ def predict_brain_tumor_ollama(image_bytes):
 
 def predict_brain_tumor_pytorch(image_bytes):
     """Brain tumor prediction using PyTorch fallback"""
+    _initialize()  # Lazy load if needed
+    if not TORCH_AVAILABLE or brain_model is None:
+        raise RuntimeError("PyTorch not available and Ollama not configured")
+    
     try:
+        import torch
         image_tensor = preprocess_image(image_bytes).unsqueeze(0).to(device)
         with torch.no_grad():
             output = brain_model(image_tensor)
@@ -131,6 +152,7 @@ def predict_brain_tumor_pytorch(image_bytes):
 
 def predict_brain_tumor(image_bytes):
     """Brain tumor prediction with Ollama preferred, PyTorch fallback"""
+    _initialize()  # Lazy load if needed
     if use_ollama:
         return predict_brain_tumor_ollama(image_bytes)
     else:
